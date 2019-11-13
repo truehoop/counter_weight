@@ -38,7 +38,7 @@ data = {
 "byLine": "",
 "categoryCodes": [],
 "dateCodes": [],
-"endDate": "2019-11-12",
+"endDate": "2019-11-14",
 "incidentCodes": [],
 "indexName": "news",
 "isNotTmUsable": 'false',
@@ -49,13 +49,13 @@ data = {
 "providerCodes": [],
 "resultNumber": 10,
 "searchFilterType": "1",
-"searchKey": "삼성 최순실",
-"searchKeys": [{}],
+"searchKey": "(삼성 OR  신세계 OR  현대 OR  SK OR LG)",
+"searchKeys": [{"orKeywords": ["삼성, 신세계, 현대, SK,LG"]}],
 "searchScopeType": "1",
 "searchSortType": "date",
 "sortMethod": "date",
-"startDate": "2019-08-12",
-"startNo": 12,
+"startDate": "2019-08-14",
+"startNo": 1,
 "topicOrigin": ""
 }
 
@@ -91,6 +91,13 @@ print(response.text)
 res = response.json()
 print(res)
 print(res['totalCount'])
+print(res['resultList'])
+for result in res['resultList']:
+    print(result)
+    print(result['NEWS_ID'])
+    news_url = f"https://www.bigkinds.or.kr/news/detailView.do?docId={result['NEWS_ID']}&returnCnt=1&sectionDiv=1000"
+    response = requests.get(news_url, data=body, headers=headers)
+    print(response)
 
 # for tag in soup.select('.resultList li h3'):
 #     doc_id = tag['id'].replace('news_', '')
