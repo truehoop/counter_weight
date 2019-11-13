@@ -1,0 +1,4 @@
+xlrd==1.2.0
+beautifulsoup4==4.8.1
+PyMySQL==0.9.3
+requests==2.18.4
