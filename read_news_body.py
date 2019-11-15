@@ -1,5 +1,11 @@
 #-*- coding:utf-8 -*-
 
+import requests
+import json
+from bs4 import BeautifulSoup
+import asyncio
+import aiohttp
+
 # 전처리 과정 'Form Data' 복사해서 사전타입으로 정리
 lines = '''byLine: 
 categoryCodes: []
@@ -49,8 +55,10 @@ data = {
 "providerCodes": [],
 "resultNumber": 10,
 "searchFilterType": "1",
-"searchKey": "(삼성 OR  신세계 OR  현대 OR  SK OR LG)",
-"searchKeys": [{"orKeywords": ["삼성, 신세계, 현대, SK,LG"]}],
+"searchKey": "삼성 최순실",
+# "searchKey": "(삼성 OR  신세계 OR  현대 OR  SK OR LG)",
+"searchKeys": [{}],
+# "searchKeys": [{"orKeywords": ["삼성, 신세계, 현대, SK,LG"]}],
 "searchScopeType": "1",
 "searchSortType": "date",
 "sortMethod": "date",
@@ -58,10 +66,6 @@ data = {
 "startNo": 1,
 "topicOrigin": ""
 }
-
-import requests
-import json
-from bs4 import BeautifulSoup
 
 result_url = "https://www.kinds.or.kr/api/news/search.do"
 headers = {
@@ -76,28 +80,72 @@ headers = {
     "X-Requested-With": "XMLHttpRequest",
 }
 
-print(result_url)
-#print(data)
 print(json.dumps(data, ensure_ascii = False))
 body = json.dumps(data, ensure_ascii = False).encode('utf-8')
 print(headers)
-response = requests.post(result_url, data=body, headers=headers)
-print(response)
+loop = asyncio.get_event_loop()
+count = 0
 
-html = response.text
-soup = BeautifulSoup(html, 'html.parser')
+async def fetch_post(session, url, body):
+    async with session.post(url, json=body, headers=headers) as response:
+        return await response.json()
 
-print(response.text)
-res = response.json()
-print(res)
-print(res['totalCount'])
-print(res['resultList'])
-for result in res['resultList']:
-    print(result)
-    print(result['NEWS_ID'])
-    news_url = f"https://www.bigkinds.or.kr/news/detailView.do?docId={result['NEWS_ID']}&returnCnt=1&sectionDiv=1000"
-    response = requests.get(news_url, data=body, headers=headers)
-    print(response)
+async def fetch_get(session, url):
+    async with session.post(url, headers=headers) as response:
+        return await response.json()
+
+async def read_news_detail(session, res):
+    for result in res['resultList']:
+        # print(result)
+        # print(result['NEWS_ID'])
+        news_url = f"https://www.bigkinds.or.kr/news/detailView.do?docId={result['NEWS_ID']}&returnCnt=1&sectionDiv=1000"
+        response = await fetch_get(session, news_url)
+        # response = requests.get(news_url, data=body, headers=headers)
+        # print(response)
+        global count
+        count = count + 1
+        print(count)
+        # print(response['detail']['TITLE'])
+
+
+async def post_news_list():
+    tasks = []
+    async with aiohttp.ClientSession() as session:
+        first_call = await fetch_post(session, result_url, data)
+        print('totalCount: ', first_call['totalCount'])
+        for index in range(1, int((first_call['totalCount']+9)/10)):
+            print(index)
+            data['startNo'] = index
+            print(data)
+            tasks.append(fetch_post(session, result_url, data))
+
+        news_list = await asyncio.gather(*tasks)
+        for news in news_list:
+            # print(news)
+            # print(news['resultList'])
+            await read_news_detail(session, news)
+
+    # response = requests.post(result_url, data=body, headers=headers)
+    # print(response)
+
+    # res = response.json()
+    # print(res)
+    # print(res['totalCount'])
+    # print(res['resultList'])
+
+async def main():
+    print('Hello ...')
+    await asyncio.sleep(1)
+    await post_news_list()
+    print('... World!')
+    
+
+asyncio.run(main())
+
+def parsing(response):
+    html = response.text
+    soup = bs4(html, 'html.parser')
+    print(response.text)
 
 # for tag in soup.select('.resultList li h3'):
 #     doc_id = tag['id'].replace('news_', '')
