@@ -2,9 +2,12 @@
 
 import requests
 import json
+import traceback
+
 from bs4 import BeautifulSoup
 import asyncio
 import aiohttp
+from utils.time import now_ms_ts
 
 # 전처리 과정 'Form Data' 복사해서 사전타입으로 정리
 lines = '''byLine: 
@@ -38,13 +41,13 @@ for line in lines:
     if value == 'null':
         value = None
     data[key] = value
-    print(key, value)
+    # print(key, value)
 
 data = {
 "byLine": "",
 "categoryCodes": [],
 "dateCodes": [],
-"endDate": "2019-11-14",
+"endDate": "2019-11-16",
 "incidentCodes": [],
 "indexName": "news",
 "isNotTmUsable": 'false',
@@ -55,14 +58,14 @@ data = {
 "providerCodes": [],
 "resultNumber": 10,
 "searchFilterType": "1",
-"searchKey": "삼성 최순실",
-# "searchKey": "(삼성 OR  신세계 OR  현대 OR  SK OR LG)",
-"searchKeys": [{}],
-# "searchKeys": [{"orKeywords": ["삼성, 신세계, 현대, SK,LG"]}],
+# "searchKey": "삼성 최순실",
+"searchKey": "(삼성 OR  신세계 OR  현대 OR  SK OR LG)",
+# "searchKeys": [{}],
+"searchKeys": [{"orKeywords": ["삼성, 신세계, 현대, SK,LG"]}],
 "searchScopeType": "1",
 "searchSortType": "date",
 "sortMethod": "date",
-"startDate": "2019-08-14",
+"startDate": "2019-10-16",
 "startNo": 1,
 "topicOrigin": ""
 }
@@ -87,26 +90,42 @@ loop = asyncio.get_event_loop()
 count = 0
 
 async def fetch_post(session, url, body):
-    async with session.post(url, json=body, headers=headers) as response:
-        return await response.json()
+    try:
+        async with session.post(url, json=body, headers=headers) as response:
+            return await response.json()
+    except Exception as e:
+        print('e={}, trace={}'.format(repr(e), traceback.format_exc()))
 
-async def fetch_get(session, url):
-    async with session.post(url, headers=headers) as response:
-        return await response.json()
+async def fetch_get(session, url, result):
+    try:
+        async with session.post(url, headers=headers) as response:
+            return await response.json()
+    except Exception as e:
+        print('e={}, trace={}'.format(repr(e), traceback.format_exc()))
+        print(result)
 
-async def read_news_detail(session, res):
+def read_news_detail(session, res):
+    before_read_list = now_ms_ts()
+    tasks = []
+
     for result in res['resultList']:
         # print(result)
         # print(result['NEWS_ID'])
         news_url = f"https://www.bigkinds.or.kr/news/detailView.do?docId={result['NEWS_ID']}&returnCnt=1&sectionDiv=1000"
-        response = await fetch_get(session, news_url)
+        # response = await fetch_get(session, news_url)
+        tasks.append(fetch_get(session, news_url, result))
         # response = requests.get(news_url, data=body, headers=headers)
         # print(response)
         global count
         count = count + 1
-        print(count)
+        # if count > 100:
+        #     break
+        if count % 1000 == 0:
+            print(count)
         # print(response['detail']['TITLE'])
-
+    # news_list = await asyncio.gather(*tasks)
+    return tasks
+    print('Every 10 post', now_ms_ts() - before_read_list)
 
 async def post_news_list():
     tasks = []
@@ -114,17 +133,25 @@ async def post_news_list():
         first_call = await fetch_post(session, result_url, data)
         print('totalCount: ', first_call['totalCount'])
         for index in range(1, int((first_call['totalCount']+9)/10)):
-            print(index)
             data['startNo'] = index
-            print(data)
             tasks.append(fetch_post(session, result_url, data))
-
+        
+        before_read_news_detail = now_ms_ts()
         news_list = await asyncio.gather(*tasks)
+        print('뉴스 리스트 호출 시 걸린 시간 :', now_ms_ts() - before_read_news_detail)
+        detail_tasks = []
         for news in news_list:
             # print(news)
             # print(news['resultList'])
-            await read_news_detail(session, news)
+            detail_list = read_news_detail(session, news)
+            detail_tasks.extend(detail_list)
+        
+        news_detail_list = await asyncio.gather(*detail_tasks)
+        print('전체 호출 시 걸린 시간 :', now_ms_ts() - before_read_news_detail)
 
+        for news_detail in news_detail_list:
+            pass
+            # print(news_detail['detail']['TITLE'])
     # response = requests.post(result_url, data=body, headers=headers)
     # print(response)
 
@@ -153,25 +180,34 @@ def parsing(response):
 #     print(tag.text.strip(), doc_url)
 
 
-# import pymysql
-# from dotenv import load_dotenv
-# load_dotenv()
+import pymysql
+from dotenv import load_dotenv
+load_dotenv()
 
-# import os
+import os
 
-# # Establish a MySQL connection
-# db_url = os.environ['DB_URL']
-# db_user = os.environ['DB_USER']
-# db_password = os.environ['DB_PASSWORD']
-# db_name = os.environ['DB_NAME']
-# database = pymysql.connect (db_url, db_user, db_password, db_name)
-# print(f'Now you gonna Connect to {db_url}')
+# Establish a MySQL connection
+db_url = os.environ['DB_LOCAL_URL']
+db_user = os.environ['DB_LOCAL_USER']
+db_password = os.environ['DB_LOCAL_PASSWORD']
+db_port = int(os.environ['DB_LOCAL_PORT'])
+db_name = os.environ['DB_LOCAL_NAME']
 
-# # Get the cursor, which is used to traverse the database, line by line
-# cursor = database.cursor()
+if os.environ['DB_USE_LOCAL'] == False:
+    db_url = os.environ['DB_URL']
+    db_user = os.environ['DB_USER']
+    db_password = os.environ['DB_PASSWORD']
+    db_port = 3306
+    db_name = os.environ['DB_NAME']
 
-# # Create the INSERT INTO sql query
-# query = """INSERT INTO news_data_all (id, news_date, media_name, writer, title, key1, key2, key3, acident1, acident2, acident3, `character`, location, agency, keyword, keyword_export, sentence, url, exception) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) ON DUPLICATE KEY UPDATE duplication = VALUES(duplication) + 1"""
+database = pymysql.connect (host=db_url, port=db_port, user=db_user, passwd=db_password, db='mysql')
+print(f'Now you gonna Connect to {db_url}')
+
+# Get the cursor, which is used to traverse the database, line by line
+cursor = database.cursor()
+
+# Create the INSERT INTO sql query
+query = """INSERT INTO news_data_all (id, news_date, media_name, writer, title, key1, key2, key3, acident1, acident2, acident3, `character`, location, agency, keyword, keyword_export, sentence, url, exception) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) ON DUPLICATE KEY UPDATE duplication = VALUES(duplication) + 1"""
 
 # book = xlrd.open_workbook(file_name)
 # sheet = book.sheet_by_name("sheet")
