@@ -3,3 +3,6 @@ beautifulsoup4==4.8.1
 PyMySQL==0.9.3
 requests==2.18.4
 python-dotenv==0.10.3
+Django==2.2
+djangorestframework==2.2
+mysqlclient==1.4.5
