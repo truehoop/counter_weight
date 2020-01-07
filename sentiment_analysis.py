@@ -1,7 +1,6 @@
 import read_data_from_xslx
 
 eval_result = read_data_from_xslx.get_sheet_value()
-print(eval_result)
 
 import pymysql
 from dotenv import load_dotenv
@@ -28,15 +27,17 @@ except Exception as e:
     print('e={}, trace={}'.format(repr(e), traceback.format_exc()))
 
 rows = cursor.fetchall()
-print(len(eval_result))
+print("rows", len(rows))
+print("eval_result", len(eval_result))
+
 data = []
 for row in rows:
     if row[0] in eval_result.keys():
         data.append((row[0], row[1], row[2], row[3], eval_result[row[0]]))
 
 length = len(data)
-train_data = data[:int(length/2)]
-test_data = data[int(length/2):]
+train_data = data[:int(length*5/7)]
+test_data = data[int(length*5/7):]
 print(f"총 {length}개의 기사를 불러왔습니다.")
 
 cursor.close()
@@ -77,13 +78,13 @@ for row in test_data:
     temp_X = [word for word in temp_X if not word in stopwords] # 불용어 제거
     all_nouns2.append(temp_X)
 
-print(now_ms_ts() - before_analyze_text)
+print('기사 분석에 걸린 시간 : ', now_ms_ts() - before_analyze_text)
 print('기사 분석 끝!')
 print('첫 번째 기사 토큰', all_nouns[1])
 
 from keras.preprocessing.text import Tokenizer
 
-max_words = 35000
+max_words = 30000
 tokenizer = Tokenizer(num_words = max_words)
 tokenizer.fit_on_texts(all_nouns)
 
@@ -102,24 +103,27 @@ plt.ylabel('number of Data')
 import numpy as np
 y_train = []
 y_test = []
+
+type_of_result = 18
+y_result = []
+for i in range(type_of_result):
+    temp = []
+    for j in range(type_of_result):
+        if j == i:
+            temp.append(1)
+        else:
+            temp.append(0)
+    y_result.append(temp.copy())
+
 for i in range(len(train_data)):
-    if train_data[i][4] == 1:
-        y_train.append([1, 0, 0, 0])
-    elif train_data[i][4] == 2:
-        y_train.append([0, 1, 0, 0])
-    elif train_data[i][4] == 3:
-        y_train.append([0, 0, 1, 0])
-    elif train_data[i][4] == 4:
-        y_train.append([0, 0, 0, 1])
+    for type in range(type_of_result):
+        if train_data[i][4] == type:
+            y_train.append(y_result[type].copy())
+
 for i in range(len(test_data)):
-    if test_data[i][4] == 1:
-        y_test.append([1, 0, 0, 0])
-    elif test_data[i][4] == 2:
-        y_test.append([0, 1, 0, 0])
-    elif test_data[i][4] == 3:
-        y_test.append([0, 0, 1, 0])
-    elif test_data[i][4] == 4:
-        y_test.append([0, 0, 0, 1])
+    for type in range(type_of_result):
+        if test_data[i][4] == type:
+            y_test.append(y_result[type].copy())
 
 y_train = np.array(y_train)
 y_test = np.array(y_test)
@@ -131,14 +135,14 @@ y_test = np.array(y_test)
 from keras.layers import Embedding, Dense, LSTM
 from keras.models import Sequential
 from keras.preprocessing.sequence import pad_sequences
-max_len = 300 # 전체 데이터의 길이를 300으로 맞춘다
+max_len = 350 # 전체 데이터의 길이를 300으로 맞춘다
 X_train = pad_sequences(X_train, maxlen=max_len)
 X_test = pad_sequences(X_test, maxlen=max_len)
 
 model = Sequential()
-model.add(Embedding(max_words, 100))
+model.add(Embedding(max_words, 120))
 model.add(LSTM(128))
-model.add(Dense(4, activation='softmax'))
+model.add(Dense(type_of_result, activation='softmax'))
 model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
 history = model.fit(X_train, y_train, epochs=10, batch_size=10, validation_split=0.1)
 
@@ -150,7 +154,7 @@ predict = model.predict(X_test)
 import numpy as np
 predict_labels = np.argmax(predict, axis=1)
 original_labels = np.argmax(y_test, axis=1)
-for i in range(40):
+for i in range(50):
     print("기사제목 : ", test_data[i][2], "/\t 원래 라벨 : ", original_labels[i], "/\t예측한 라벨 : ", predict_labels[i])
 
 model.save('LSTM_MODEL_epochs_10_batchsize_10_validation_split_0dot1_accuration_94.h5')

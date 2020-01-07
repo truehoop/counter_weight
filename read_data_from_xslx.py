@@ -4,32 +4,40 @@ workbook = load_workbook(filename = 'eval_result.xlsx')
 print(workbook.sheetnames)
 sheet = workbook.active
 
-sheet_ranges = workbook['추가기사합치기']
-print(sheet_ranges['A2'].value)
+read_mode = 'TYPE'
+
+sheet_ranges = workbook['ID랑title기준 동일기사삭제']
 sheet_ids = sheet_ranges['A']
-sheet_values = sheet_ranges['M']
-# print(sheet_ids)
-# print(sheet_values)
 result = {}
-print(len(sheet_ids))
 
-sheet_val_none = 0
+if read_mode == 'PN':
+    sheet_values = sheet_ranges['J']
+    for idx in range(len(sheet_ids)):
+        sheet_val = sheet_values[idx].value
+        if sheet_val is None:
+            continue
+        elif sheet_val == 'P' or sheet_val == 'p':
+            result[sheet_ids[idx].value] = 0
+        elif sheet_val == 'N' or sheet_val == 'n':
+            result[sheet_ids[idx].value] = 1
+        else:
+            continue
 
-
-for idx in range(len(sheet_ids)):
-    sheet_val = sheet_values[idx].value
-    if sheet_val is None:
-        continue
-    elif sheet_val is None:
-        result[sheet_ids[idx].value] = 4
-    elif sheet_val == 'P' or sheet_val == 'p':
-        result[sheet_ids[idx].value] = 1
-    elif sheet_val == 'N' or sheet_val == 'n':
-        result[sheet_ids[idx].value] = 2
-    else:
-        result[sheet_ids[idx].value] = 3
+elif read_mode == 'TYPE':
+    sheet_values = sheet_ranges['G']
+    for idx in range(len(sheet_ids)):
+        if idx == 0:
+            continue
+        sheet_val = sheet_values[idx].value
+        if sheet_val is None or sheet_val == '?':
+            continue
+        elif sheet_val == 'X':
+            result[sheet_ids[idx].value] = 17
+            continue
+        result[sheet_ids[idx].value] = int(sheet_val)-1
 
 def get_sheet_value():
     return result
 
+print('sheet_ids', len(sheet_ids))
 # print(result)
