@@ -1,3 +1,7 @@
+import read_data_from_xslx
+
+eval_result = read_data_from_xslx.get_sheet_value()
+print(eval_result)
 
 import pymysql
 from dotenv import load_dotenv
@@ -16,16 +20,23 @@ cursor = database.cursor()
 # Create the INSERT INTO sql query
 query = "select news_date, title, body from manjum.analyzer_news where keyword like '%삼성%' order by news_date limit 300 "
 query2 = "select news_date, title, body, valid from manjum.analyzer_news where valid > 0 and valid < 4 order by news_date limit 300"
+query3 = "select id, news_date, title, body, valid from manjum.analyzer_news order by id "
 
 try:
-    cursor.execute(query2)
+    cursor.execute(query3)
 except Exception as e:
     print('e={}, trace={}'.format(repr(e), traceback.format_exc()))
 
 rows = cursor.fetchall()
-length = len(rows)
-train_data = rows[:int(length/2)]
-test_data = rows[int(length/2):]
+print(len(eval_result))
+data = []
+for row in rows:
+    if row[0] in eval_result.keys():
+        data.append((row[0], row[1], row[2], row[3], eval_result[row[0]]))
+
+length = len(data)
+train_data = data[:int(length/2)]
+test_data = data[int(length/2):]
 print(f"총 {length}개의 기사를 불러왔습니다.")
 
 cursor.close()
@@ -41,26 +52,34 @@ database.close()
 # 불용어
 stopwords=['의','가','이','은','들','는','좀','잘','걍','과','도','를','으로','자','에','와','한','하다']
 
-from konlpy.tag import Kkma
+from konlpy.tag import Kkma, Okt
 from konlpy.utils import pprint
 
 kkma = Kkma()
+okt = Okt()
 
-test_nouns = kkma.nouns(rows[1][2])
+test_nouns = kkma.nouns(rows[1][3])
 
 before_analyze_text = now_ms_ts()
 all_nouns = []
 all_nouns2 = []
 for row in train_data:
-    current_nouns = kkma.nouns(row[2])
-    all_nouns.append(current_nouns)
+    # current_nouns = kkma.nouns(row[2])
+    # current_nouns = okt.nouns(row[2])
+    temp_X = okt.morphs(row[3], stem=True) # 토큰화
+    temp_X = [word for word in temp_X if not word in stopwords] # 불용어 제거
+    all_nouns.append(temp_X)
 
 for row in test_data:
-    current_nouns = kkma.nouns(row[2])
-    all_nouns2.append(current_nouns)
+    # current_nouns = kkma.nouns(row[2])
+    # current_nouns = okt.nouns(row[2])
+    temp_X = okt.morphs(row[3], stem=True) # 토큰화
+    temp_X = [word for word in temp_X if not word in stopwords] # 불용어 제거
+    all_nouns2.append(temp_X)
 
 print(now_ms_ts() - before_analyze_text)
 print('기사 분석 끝!')
+print('첫 번째 기사 토큰', all_nouns[1])
 
 from keras.preprocessing.text import Tokenizer
 
@@ -84,22 +103,22 @@ import numpy as np
 y_train = []
 y_test = []
 for i in range(len(train_data)):
-    if train_data[i][3] == 1:
-        y_train.append([1, 0, 0])
-    elif train_data[i][3] == 2:
-        y_train.append([0, 1, 0])
-    elif train_data[i][3] == 3:
-        y_train.append([0, 0, 1])
-    elif train_data[i][3] == 4:
-        y_train.append([0, 0, 0])
+    if train_data[i][4] == 1:
+        y_train.append([1, 0, 0, 0])
+    elif train_data[i][4] == 2:
+        y_train.append([0, 1, 0, 0])
+    elif train_data[i][4] == 3:
+        y_train.append([0, 0, 1, 0])
+    elif train_data[i][4] == 4:
+        y_train.append([0, 0, 0, 1])
 for i in range(len(test_data)):
-    if test_data[i][3] == 1:
-        y_test.append([1, 0, 0])
-    elif test_data[i][3] == 2:
-        y_test.append([0, 1, 0])
-    elif test_data[i][3] == 3:
-        y_test.append([0, 0, 1])
-    elif test_data[i][3] == 4:
+    if test_data[i][4] == 1:
+        y_test.append([1, 0, 0, 0])
+    elif test_data[i][4] == 2:
+        y_test.append([0, 1, 0, 0])
+    elif test_data[i][4] == 3:
+        y_test.append([0, 0, 1, 0])
+    elif test_data[i][4] == 4:
         y_test.append([0, 0, 0, 1])
 
 y_train = np.array(y_train)
@@ -112,14 +131,14 @@ y_test = np.array(y_test)
 from keras.layers import Embedding, Dense, LSTM
 from keras.models import Sequential
 from keras.preprocessing.sequence import pad_sequences
-max_len = 300 # 전체 데이터의 길이를 20로 맞춘다
+max_len = 300 # 전체 데이터의 길이를 300으로 맞춘다
 X_train = pad_sequences(X_train, maxlen=max_len)
 X_test = pad_sequences(X_test, maxlen=max_len)
 
 model = Sequential()
 model.add(Embedding(max_words, 100))
 model.add(LSTM(128))
-model.add(Dense(3, activation='softmax'))
+model.add(Dense(4, activation='softmax'))
 model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
 history = model.fit(X_train, y_train, epochs=10, batch_size=10, validation_split=0.1)
 
@@ -131,9 +150,10 @@ predict = model.predict(X_test)
 import numpy as np
 predict_labels = np.argmax(predict, axis=1)
 original_labels = np.argmax(y_test, axis=1)
-for i in range(30):
-    print("기사본문 : ", test_data[i][1], "/\t 원래 라벨 : ", original_labels[i], "/\t예측한 라벨 : ", predict_labels[i])
+for i in range(40):
+    print("기사제목 : ", test_data[i][2], "/\t 원래 라벨 : ", original_labels[i], "/\t예측한 라벨 : ", predict_labels[i])
 
+model.save('LSTM_MODEL_epochs_10_batchsize_10_validation_split_0dot1_accuration_94.h5')
 
 exit()
 
