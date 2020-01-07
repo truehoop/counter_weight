@@ -66,7 +66,7 @@ data = {
 "searchScopeType": "2",
 "searchSortType": "date",
 "sortMethod": "date",
-"startDate": "2018-11-20",
+"startDate": "2017-01-01",
 "startNo": 1,
 "topicOrigin": ""
 }
@@ -186,21 +186,35 @@ db_password = os.environ['DB_LOCAL_PASSWORD']
 db_port = int(os.environ['DB_LOCAL_PORT'])
 db_name = os.environ['DB_LOCAL_NAME']
 
-if os.environ['DB_USE_LOCAL'] == False:
+if os.environ['DB_USE_LOCAL'] == 'FALSE':
     db_url = os.environ['DB_URL']
     db_user = os.environ['DB_USER']
     db_password = os.environ['DB_PASSWORD']
-    db_port = 3306
+    db_port = os.environ['DB_PORT'] 
     db_name = os.environ['DB_NAME']
-
-database = pymysql.connect (host=db_url, port=db_port, user=db_user, passwd=db_password, db='mysql')
+    import sqlalchemy
+    engine = sqlalchemy.create_engine(sqlalchemy.engine.url.URL(
+        drivername='mysql+pymysql',
+        host=db_url,
+        username=db_user,
+        password=db_password,
+        database=db_name,
+        query={
+            'unix_socket': '/cloudsql/{}'.format("manjum:asia-northeast2:manjum"),
+            'charset': 'utf8mb4'
+        }
+    ),
+    )
+    database = engine.connect()
+else:
+    database = pymysql.connect (host=db_url, port=db_port, user=db_user, passwd=db_password, db='mysql')
 print(f'Now you gonna Connect to {db_url}')
 
 # Get the cursor, which is used to traverse the database, line by line
 cursor = database.cursor()
 
 # Create the INSERT INTO sql query
-query = """INSERT INTO manjum.news_data_all (id, news_date, media_name, writer, title, key1, key2, key3, acident1, acident2, acident3, `character`, location, agency, keyword, keyword_export, url, exception, body) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) ON DUPLICATE KEY UPDATE duplication = VALUES(duplication) + 1"""
+query = """INSERT INTO manjum.analyzer_news (id, news_date, media_name, writer, title, key1, key2, key3, acident1, acident2, acident3, `character`, location, agency, keyword, keyword_export, url, exception, body) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) ON DUPLICATE KEY UPDATE valid = VALUES(valid) + 1"""
 
 def insert_news_to_db(news_detail_list):
     before_query = now_ms_ts()
@@ -209,6 +223,8 @@ def insert_news_to_db(news_detail_list):
 
     for detail in news_detail_list:
         # print(detail)
+        if detail['detail'] == None:
+            continue
         detail_data = detail['detail']
         # print(detail_data['TITLE'])
         id          = detail_data['NEWS_ID']
@@ -217,13 +233,13 @@ def insert_news_to_db(news_detail_list):
         writer      = detail_data['BYLINE']
         title       = detail_data['TITLE']
         key         = detail_data['CATEGORY'].split('|')
-        key1        = key[0] if len(key) > 0 else ''
-        key2        = key[1] if len(key) > 1 else ''
-        key3        = key[2] if len(key) > 2 else ''
+        key1        = key[0].replace("</font>","").replace("<font color=Gray>","") if len(key) > 0 else ''
+        key2        = key[1].replace("</font>","").replace("<font color=Gray>","") if len(key) > 1 else ''
+        key3        = key[2].replace("</font>","").replace("<font color=Gray>","") if len(key) > 2 else ''
         acident     = detail_data['CATEGORY_INCIDENT'].split('|')
-        acident1    = acident[0] if len(acident) > 0 else ''
-        acident2    = acident[1] if len(acident) > 1 else ''
-        acident3    = acident[2] if len(acident) > 2 else ''
+        acident1    = acident[0].replace("</font>","").replace("<font color=Gray>","") if len(acident) > 0 else ''
+        acident2    = acident[1].replace("</font>","").replace("<font color=Gray>","") if len(acident) > 1 else ''
+        acident3    = acident[2].replace("</font>","").replace("<font color=Gray>","") if len(acident) > 2 else ''
         character   = detail_data['TMS_NE_PERSON']
         location    = detail_data['TMS_NE_LOCATION']
         agency      = detail_data['TMS_NE_ORGANIZATION']
@@ -235,7 +251,7 @@ def insert_news_to_db(news_detail_list):
         
         values = (id, news_date, media_name, writer, title, key1, key2, key3, acident1, acident2, acident3, character, location, agency, keyword, keyword_export, url, exception, body)
         
-        if title == '' or writer == '' or id == '' or media_name == '':
+        if id == '':
             print(values)
         try:
             cursor.execute(query, values)
