@@ -36,8 +36,8 @@ for row in rows:
         data.append((row[0], row[1], row[2], row[3], eval_result[row[0]]))
 
 length = len(data)
-train_data = data[:int(length*5/7)]
-test_data = data[int(length*5/7):]
+train_data = data[:int(length*3/4)]
+test_data = data[int(length*3/4):]
 print(f"총 {length}개의 기사를 불러왔습니다.")
 
 cursor.close()
@@ -51,7 +51,7 @@ database.close()
 ###################################################
 
 # 불용어
-stopwords=['의','가','이','은','들','는','좀','잘','걍','과','도','를','으로','자','에','와','한','하다']
+stopwords=['의','가','이','은','들','는','좀','잘','걍','과','도','를','으로','자','에','와','한','하다', 'br', '/><', '/>', '.<']
 
 from konlpy.tag import Kkma, Okt
 from konlpy.utils import pprint
@@ -84,9 +84,20 @@ print('첫 번째 기사 토큰', all_nouns[1])
 
 from keras.preprocessing.text import Tokenizer
 
-max_words = 30000
+import json
+
+max_words = 10000
 tokenizer = Tokenizer(num_words = max_words)
 tokenizer.fit_on_texts(all_nouns)
+
+from datetime import datetime
+now = datetime.now()
+current_time = now.strftime("%H-%M-%S")
+outputfilename = 'all_nouns' + current_time + '.json'
+
+with open(outputfilename, 'w') as outfile:
+    json.dump(all_nouns, outfile)
+
 
 X_train = tokenizer.texts_to_sequences(all_nouns)
 X_test = tokenizer.texts_to_sequences(all_nouns2)
@@ -135,13 +146,13 @@ y_test = np.array(y_test)
 from keras.layers import Embedding, Dense, LSTM
 from keras.models import Sequential
 from keras.preprocessing.sequence import pad_sequences
-max_len = 350 # 전체 데이터의 길이를 300으로 맞춘다
+max_len = 360 # 전체 데이터의 길이를 300으로 맞춘다
 X_train = pad_sequences(X_train, maxlen=max_len)
 X_test = pad_sequences(X_test, maxlen=max_len)
 
 model = Sequential()
-model.add(Embedding(max_words, 120))
-model.add(LSTM(128))
+model.add(Embedding(max_words, 60))
+model.add(LSTM(30))
 model.add(Dense(type_of_result, activation='softmax'))
 model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
 history = model.fit(X_train, y_train, epochs=10, batch_size=10, validation_split=0.1)
@@ -157,7 +168,7 @@ original_labels = np.argmax(y_test, axis=1)
 for i in range(50):
     print("기사제목 : ", test_data[i][2], "/\t 원래 라벨 : ", original_labels[i], "/\t예측한 라벨 : ", predict_labels[i])
 
-model.save('LSTM_MODEL_epochs_10_batchsize_10_validation_split_0dot1_accuration_94.h5')
+model.save('lstm_model_yn_'+ current_time + '.h5')
 
 exit()
 
