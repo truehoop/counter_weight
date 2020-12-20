@@ -28,7 +28,7 @@ data = {
     "searchFilterType": "1",
     # "searchKey": "삼성 최순실",
     # 검색식
-    "searchKey": "((삼성 OR 신세계 OR 현대 OR SK OR LG OR 롯데 OR 포스코 OR 한화 OR GS OR 농협 OR KT) AND (가계빈곤 OR 경제노출 OR 경제충격 OR 근로빈곤층 OR 기아 OR 기초생활 OR 기초생활보장 OR 남성빈곤 OR 노인빈곤 OR 노인일자리 OR 미달가구 OR 보험 OR 빈곤 OR 빈곤인구 OR 빈곤층 OR 사각지대 OR 사회노출 OR 사회보장 OR 사회보장제도 OR 사회서비스 OR 사회안전망 OR 사회충격 OR 생계 OR 성별빈곤 OR 소득 OR 실업급여 OR 여성빈곤 OR 영양실조 OR 의료 OR 이주민빈곤 OR 장애빈곤 OR 재난 OR 재난노출 OR 주거 OR 청년빈곤 OR 청소년빈곤 OR 최저주거 OR 취약계층 OR 환경노출 OR 환경충격))",
+    "searchKey": "((사업 OR 정책) AND (기상 OR 온실가스 OR 수질OR 소음 OR 전파장해))",
     "searchKeys": [{}],
     # "searchKeys": [{"orKeywords": ["삼성, 신세계, 현대, SK,LG"]}],
     "searchScopeType": "1",  # 1: 제목검색 2: 제목+내용검색
@@ -83,20 +83,13 @@ def read_news_detail(session, res):
     tasks = []
 
     for result in res['resultList']:
-        # print(result)
-        # print(result['NEWS_ID'])
         news_url = f"https://www.bigkinds.or.kr/news/detailView.do?docId={result['NEWS_ID']}&returnCnt=1&sectionDiv=1000"
-        # response = await fetch_get(session, news_url)
         tasks.append(fetch_get(session, news_url, result))
         # response = requests.get(news_url, data=body, headers=headers)
-        # print(response)
         global count
         count = count + 1
-        # if count > 100:
-        #     break
         if count % 1000 == 0:
-            print(count)
-        # print(response['detail']['TITLE'])
+            print(count, '개의 기사를 수집했습니다')
     # news_list = await asyncio.gather(*tasks)
     return tasks
     print('Every 10 post', now_ms_ts() - before_read_list)
@@ -112,7 +105,19 @@ async def post_news_list():
             temp_data = copy.copy(data)
             tasks.append(fetch_post(session, result_url, temp_data))
 
-        # before_read_?ext.strip(), doc_url)
+        before_read_news_detail = now_ms_ts()
+        news_list = await asyncio.gather(*tasks)
+        print('뉴스 리스트 호출 시 걸린 시간 :', now_ms_ts() - before_read_news_detail , 'ms')
+        detail_tasks = []
+        for news in news_list:
+            detail_list = read_news_detail(session, news)
+            detail_tasks.extend(detail_list)
+        
+        news_detail_list = await asyncio.gather(*detail_tasks)
+        
+        print('전체 호출 시 걸린 시간 :', now_ms_ts() - before_read_news_detail ,'ms')
+        
+        return news_detail_list
 
 
 import pymysql
@@ -172,38 +177,37 @@ def insert_news_to_db(news_detail_list):
             continue
         detail_data = detail['detail']
         # print(detail_data['TITLE'])
-        id = detail_data['NEWS_ID']
-        news_date = detail_data['DATE']
-        media_name = detail_data['PROVIDER']
-        writer = detail_data['BYLINE']
-        title = detail_data['TITLE']
-        key = detail_data['CATEGORY'].split('|')
-        key1 = key[0].replace("</font>", "").replace("<font color=Gray>", "") if len(key) > 0 else ''
-        key2 = key[1].replace("</font>", "").replace("<font color=Gray>", "") if len(key) > 1 else ''
-        key3 = key[2].replace("</font>", "").replace("<font color=Gray>", "") if len(key) > 2 else ''
-        acident = detail_data['CATEGORY_INCIDENT'].split('|')
-        acident1 = acident[0].replace("</font>", "").replace("<font color=Gray>", "") if len(acident) > 0 else ''
-        acident2 = acident[1].replace("</font>", "").replace("<font color=Gray>", "") if len(acident) > 1 else ''
-        acident3 = acident[2].replace("</font>", "").replace("<font color=Gray>", "") if len(acident) > 2 else ''
-        character = detail_data['TMS_NE_PERSON']
-        location = detail_data['TMS_NE_LOCATION']
-        agency = detail_data['TMS_NE_ORGANIZATION']
-        keyword = detail_data['TMS_RAW_STREAM']
-        keyword_export = detail_data['TMS_NE_STREAM']
-        url = detail_data['PROVIDER_LINK_PAGE']
-        exception = ''
-        body = detail_data['CONTENT']
-
-        values = (
-        id, news_date, media_name, writer, title, key1, key2, key3, acident1, acident2, acident3, character, location,
-        agency, keyword, keyword_export, url, exception, body)
-
+        id          = detail_data['NEWS_ID']
+        news_date   = detail_data['DATE']
+        media_name  = detail_data['PROVIDER']
+        writer      = detail_data['BYLINE']
+        title       = detail_data['TITLE']
+        key         = detail_data['CATEGORY'].split('|')
+        key1        = key[0].replace("</font>","").replace("<font color=Gray>","") if len(key) > 0 else ''
+        key2        = key[1].replace("</font>","").replace("<font color=Gray>","") if len(key) > 1 else ''
+        key3        = key[2].replace("</font>","").replace("<font color=Gray>","") if len(key) > 2 else ''
+        acident     = detail_data['CATEGORY_INCIDENT'].split('|')
+        acident1    = acident[0].replace("</font>","").replace("<font color=Gray>","") if len(acident) > 0 else ''
+        acident2    = acident[1].replace("</font>","").replace("<font color=Gray>","") if len(acident) > 1 else ''
+        acident3    = acident[2].replace("</font>","").replace("<font color=Gray>","") if len(acident) > 2 else ''
+        character   = detail_data['TMS_NE_PERSON']
+        location    = detail_data['TMS_NE_LOCATION']
+        agency      = detail_data['TMS_NE_ORGANIZATION']
+        keyword     = detail_data['TMS_RAW_STREAM']
+        keyword_export= detail_data['TMS_NE_STREAM']
+        url         = detail_data['PROVIDER_LINK_PAGE']
+        exception   = ''
+        body        = detail_data['CONTENT']
+        
+        values = (id, news_date, media_name, writer, title, key1, key2, key3, acident1, acident2, acident3, character, location, agency, keyword, keyword_export, url, exception, body)
+        
         if id == '':
             print(values)
         try:
             cursor.execute(query, values)
         except Exception as e:
             print('e={}, trace={}'.format(repr(e), traceback.format_exc()))
+
 
     # Close the cursor
     cursor.close()
@@ -213,14 +217,12 @@ def insert_news_to_db(news_detail_list):
     # Close the database connection
     database.close()
 
-    print('db insert time :', now_ms_ts() - before_query)
-
+    print('db insert time :', now_ms_ts() - before_query, 'ms')
 
 async def print_when_done(tasks):
     for res in asyncio.as_completed(tasks):
         news_detail_list = await res
         insert_news_to_db(news_detail_list)
-
 
 coros = [post_news_list()]
 loop = asyncio.get_event_loop()
