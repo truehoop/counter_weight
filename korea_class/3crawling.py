@@ -85,12 +85,10 @@ def read_news_detail(session, res):
     for result in res['resultList']:
         news_url = f"https://www.bigkinds.or.kr/news/detailView.do?docId={result['NEWS_ID']}&returnCnt=1&sectionDiv=1000"
         tasks.append(fetch_get(session, news_url, result))
-        # response = requests.get(news_url, data=body, headers=headers)
         global count
         count = count + 1
         if count % 1000 == 0:
             print(count, '개의 기사를 수집했습니다')
-    # news_list = await asyncio.gather(*tasks)
     return tasks
     print('Every 10 post', now_ms_ts() - before_read_list)
 
