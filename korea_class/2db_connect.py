@@ -23,7 +23,7 @@ values1 = ('조효진2', '에코시스템의 이해', 'A+')
 values2 = ('정효진2', '에코시스템의 이해', 'B+')
 values3 = ('이효진2', '에코시스템의 이해', 'C+')
 
-query = """INSERT INTO manjum.test(id, class, grade) VALUES (%s, %s, %s)"""
+query = """INSERT INTO manjum.test(name, class, grade) VALUES (%s, %s, %s)"""
 
 cursor.execute(query, values1)
 cursor.execute(query, values2)

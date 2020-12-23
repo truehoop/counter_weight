@@ -5,10 +5,16 @@
 import read_data_from_xslx
 eval_result = read_data_from_xslx.get_sheet_value()
 
+###################################################
+# 데이터베이스 설정 가져오기
+###################################################
 import pymysql
 from dotenv import load_dotenv
 load_dotenv()
 
+###################################################
+# 데이터베이스 연결
+###################################################
 import os
 from utils.time import now_ms_ts
 import db_connection
@@ -19,10 +25,11 @@ database = db_connection.connect()
 # Get the cursor, which is used to traverse the database, line by line
 cursor = database.cursor()
 
-# Create the INSERT INTO sql query
-query = "select news_date, title, body from manjum.analyzer_news where keyword like '%삼성%' order by news_date limit 300 "
-query2 = "select news_date, title, body, valid from manjum.analyzer_news where valid > 0 and valid < 4 order by news_date limit 300"
-query3 = "select id, news_date, title, body, valid from manjum.analyzer_news order by id "
+# 데이터베이스 조회 쿼리
+query = "select news_date, title, body from manjum.news_data where keyword like '%삼성%' order by news_date limit 300 "
+query2 = "select news_date, title, body, valid from manjum.news_data where valid > 0 and valid < 4 order by news_date limit 300"
+# 우리가 진짜 쓸 쿼리
+query3 = "select id, news_date, title, body, valid from manjum.news_data order by id "
 
 try:
     cursor.execute(query3)

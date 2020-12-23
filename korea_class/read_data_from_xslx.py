@@ -4,13 +4,19 @@ workbook = load_workbook(filename = 'eval_result.xlsx')
 print(workbook.sheetnames)
 sheet = workbook.active
 
+# read type
+# 긍정/부정평가 : 'PN'
+# 분류 : 'TYPE' 으로 설정
 read_mode = 'PN'
 
+# 사용할 시트 이름
 sheet_ranges = workbook['ID랑title기준 동일기사삭제']
+# 매칭할 뉴스 ID
 sheet_ids = sheet_ranges['A']
 result = {}
 
 if read_mode == 'PN':
+    # 긍정, 부정
     sheet_values = sheet_ranges['J']
     for idx in range(len(sheet_ids)):
         sheet_val = sheet_values[idx].value
