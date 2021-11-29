@@ -16,8 +16,8 @@
 #
 
 # Set mecab related variable(s)
-#mecab_dicdir=$my_path + lib/mecab/dic/mecab-ko-dic
-mecab_dicdir=/usr/local/lib/mecab/dic/mecab-ko-dic
+mecab_dicdir=/content/notebooks/lib/mecab/dic/mecab-ko-dic
+#mecab_dicdir=/usr/local/lib/mecab/dic/mecab-ko-dic
 
 # Exit as soon as we fail
 set -e
@@ -58,7 +58,7 @@ for dir in site.getsitepackages():
 print(1 if found else 0)
 EOF
 }
-at_user_site=""
+at_user_site="/content/notebooks"
 if [[ "$(check_python_site_location_is_writable)" == "0" ]]; then
     at_user_site="--user"
 fi
