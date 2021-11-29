@@ -16,8 +16,8 @@
 #
 
 # Set mecab related variable(s)
-mecab_dicdir=/content/notebooks/lib/mecab/dic/mecab-ko-dic
-#mecab_dicdir=/usr/local/lib/mecab/dic/mecab-ko-dic
+mecab_dicdir="/content/notebooks/lib/mecab/dic/mecab-ko-dic"
+#mecab_dicdir="/usr/local/lib/mecab/dic/mecab-ko-dic"
 
 # Exit as soon as we fail
 set -e
